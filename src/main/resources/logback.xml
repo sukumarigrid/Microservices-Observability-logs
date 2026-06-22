@@ -1,0 +1,26 @@
+<configuration>
+    <property name="APP_NAME" value="${APP_NAME:-Microservices-Observability}" />
+    <property name="LOGSTASH_HOST" value="${LOGSTASH_HOST:-localhost}" />
+    <property name="LOGSTASH_PORT" value="${LOGSTASH_PORT:-5000}" />
+    <property name="ROOT_LOG_LEVEL" value="${ROOT_LOG_LEVEL:-INFO}" />
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} %X - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOGSTASH_HOST}:${LOGSTASH_PORT}</destination>
+        <reconnectionDelay>5 seconds</reconnectionDelay>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"${APP_NAME}"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="${ROOT_LOG_LEVEL}">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="LOGSTASH" />
+    </root>
+</configuration>
