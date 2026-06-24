@@ -1,38 +1,43 @@
 package org.example;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit test for simple App.
- */
-public class AppTest 
-    extends TestCase
-{
-    /**
-     * Create the test case
-     *
-     * @param testName name of the test case
-     */
-    public AppTest( String testName )
-    {
-        super( testName );
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AppTest {
+
+    @LocalServerPort
+    private int port;
+
+    private final HttpClient client = HttpClient.newHttpClient();
+
+    @Test
+    void prometheusEndpointExposesJvmAndHttpMetrics() throws IOException, InterruptedException {
+        assertThat(get("/api/hello").statusCode()).isEqualTo(200);
+
+        String metrics = get("/actuator/prometheus").body();
+        assertThat(metrics).isNotBlank();
+        assertThat(metrics).contains("jvm_memory_used_bytes");
+        assertThat(metrics).contains("http_server_requests_seconds_count");
     }
 
-    /**
-     * @return the suite of tests being tested
-     */
-    public static Test suite()
-    {
-        return new TestSuite( AppTest.class );
+    @Test
+    void errorEndpointReturnsServerError() throws IOException, InterruptedException {
+        assertThat(get("/api/error").statusCode()).isEqualTo(500);
     }
 
-    /**
-     * Rigourous Test :-)
-     */
-    public void testApp()
-    {
-        assertTrue( true );
+    private HttpResponse<String> get(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+            .GET()
+            .build();
+        return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }

@@ -15,4 +15,6 @@ COPY --from=build /workspace/target/Microservices-Observability.jar /app/app.jar
 
 ENV APP_NAME=Microservices-Observability
 
+EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
