@@ -3,6 +3,9 @@ package org.example;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -17,6 +20,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class ObservabilityController {
     private static final Logger LOGGER = LoggerFactory.getLogger(ObservabilityController.class);
     private static final long MAX_DELAY_MS = 5_000L;
+    private final ObservationRegistry observationRegistry;
+
+    public ObservabilityController(ObservationRegistry observationRegistry) {
+        this.observationRegistry = observationRegistry;
+    }
 
     @GetMapping("/hello")
     public Map<String, Object> hello() {
@@ -28,7 +36,7 @@ public class ObservabilityController {
     public Map<String, Object> slow(@RequestParam(defaultValue = "250") long delayMs) {
         long sanitizedDelay = clamp(delayMs, 0L, MAX_DELAY_MS);
         LOGGER.info("slow endpoint invoked with delayMs={}", sanitizedDelay);
-        sleep(sanitizedDelay);
+        observe("slow-work", () -> sleep(sanitizedDelay));
         return response("slow", sanitizedDelay, 1L);
     }
 
@@ -36,7 +44,7 @@ public class ObservabilityController {
     public Map<String, Object> busy(@RequestParam(defaultValue = "250") long durationMs) {
         long sanitizedDuration = clamp(durationMs, 10L, MAX_DELAY_MS);
         LOGGER.info("busy endpoint invoked with durationMs={}", sanitizedDuration);
-        long iterations = burnCpu(sanitizedDuration);
+        long iterations = observe("busy-work", () -> burnCpu(sanitizedDuration));
         return response("busy", sanitizedDuration, iterations);
     }
 
@@ -80,5 +88,17 @@ public class ObservabilityController {
 
     private long clamp(long value, long min, long max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private void observe(String name, Runnable action) {
+        Observation.createNotStarted(name, this.observationRegistry)
+            .contextualName(name)
+            .observe(action);
+    }
+
+    private <T> T observe(String name, Supplier<T> action) {
+        return Observation.createNotStarted(name, this.observationRegistry)
+            .contextualName(name)
+            .observe(action);
     }
 }
